@@ -1,0 +1,91 @@
+package main
+
+import (
+    "bufio"
+    "errors"
+    "log"
+    "math/rand"
+    "net/url"
+    "os"
+    "strings"
+    "sync"
+    "time"
+
+    "github.com/gocolly/colly/v2"
+)
+
+var (
+    randGen  = rand.New(rand.NewSource(time.Now().UnixNano()))
+    proxyMux sync.Mutex
+)
+
+func main() {
+    // Load proxies from file
+    proxies, err := loadProxyList("proxies.txt")
+    if err != nil {
+        log.Fatal("❌ Could not load proxy list:", err)
+    }
+
+    // Shuffle proxies for randomness
+    shuffle(proxies)
+
+    // Create a Colly collector
+    c := colly.NewCollector(
+        colly.Async(true),
+        colly.UserAgent(randomUserAgent()),
+        colly.MaxDepth(3),
+        colly.AllowURLRevisit(),
+    )
+
+    // Anti-bot delay config
+    err = c.Limit(&colly.LimitRule{
+        DomainGlob:  "*",
+        Parallelism: 10,
+        Delay:       2 * time.Second,
+        RandomDelay: 4 * time.Second,
+    })
+    if err != nil {
+        log.Fatal("Limit error:", err)
+    }
+
+    // Rotate proxy and headers on every request
+    c.OnRequest(func(r *colly.Request) {
+        proxy, err := getRandomProxy(proxies)
+        if err == nil {
+            r.ProxyURL = proxy
+        } else {
+            log.Println("⚠️ Failed to get proxy:", err)
+        }
+
+        r.Headers.Set("User-Agent", randomUserAgent())
+        r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+        r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+        r.Headers.Set("Connection", "keep-alive")
+        r.Headers.Set("DNT", "1")
+
+        log.Printf("🌍 Requesting: %s via %s", r.URL, proxy)
+    })
+
+    // Handle successful responses
+    c.OnResponse(func(r *colly.Response) {
+        log.Printf("✅ Success [%d] %s", r.StatusCode, r.Request.URL)
+    })
+
+    // Handle errors (e.g., blocked, dead proxies, captchas)
+    c.OnError(func(r *colly.Response, err error) {
+        log.Printf("❌ Error [%d] on %s: %v", r.StatusCode, r.Request.URL, err)
+
+        if r.StatusCode == 429 || r.StatusCode == 403 {
+            log.Println("🚫 Blocked or rate limited. Retrying with new proxy...")
+            proxy, _ := getRandomProxy(proxies)
+            r.ProxyURL = proxy
+            time.Sleep(5 * time.Second)
+            r.Retry()
+        }
+    })
+
+    // Start scraping
+    startURL := "https://example.com"
+    c.Visit(startURL)
+    c.Wait()
+}
