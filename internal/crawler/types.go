@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Quillium-AI/Quillium-Crawler/internal/dedup"
 	"github.com/gocolly/colly"
 )
 
@@ -17,7 +18,8 @@ type Crawler struct {
 	isRunning bool
 	mutex     sync.RWMutex
 	wg        sync.WaitGroup
-	storage   Storage // Interface for storage operations
+	storage   Storage            // Interface for storage operations
+	urlFilter *dedup.BloomFilter // Bloom filter for URL deduplication
 }
 
 // Storage defines the interface for storage operations
@@ -30,10 +32,10 @@ type Storage interface {
 type CrawlerConfig struct {
 	AcceptLanguage     string
 	StartURL           string
-	MaxDepth           int
+	MaxDepth           *int          // Optional: if nil, no depth limit
 	UserAgent          string
 	ParallelRequests   int
-	MaxVisits          int
+	MaxVisits          *int          // Optional: if nil, no visit limit
 	RespectRobotsTxt   bool
 	Delay              time.Duration
 	RandomDelay        time.Duration

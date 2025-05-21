@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Quillium-AI/Quillium-Crawler/internal/dedup"
 	"github.com/Quillium-AI/Quillium-Crawler/internal/metrics"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
@@ -20,9 +21,13 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 
 	// Build all collector options in one place to avoid duplication
 	collectorOptions := []func(*colly.Collector){
-		colly.MaxDepth(options.MaxDepth),
 		colly.UserAgent(options.UserAgent),
 		colly.Async(true), // Enable async for better performance
+	}
+
+	// Only set MaxDepth if it's explicitly set
+	if options.MaxDepth != nil {
+		collectorOptions = append(collectorOptions, colly.MaxDepth(*options.MaxDepth))
 	}
 
 	// By default Colly respects robots.txt unless IgnoreRobotsTxt is explicitly set
@@ -100,10 +105,10 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 		if err := ApplyAntiBotMeasures(collector, options.AntiBotConfig); err != nil {
 			log.Printf("Warning: Failed to apply anti-bot measures: %v", err)
 		} else {
-			log.Printf("Applied anti-bot measures: UA rotation=%v, header randomization=%v, cookie handling=%v",
-				options.AntiBotConfig.EnableUserAgentRotation,
-				options.AntiBotConfig.EnableHeaderRandomization,
-				options.AntiBotConfig.EnableCookieHandling)
+			// Debug: log.Printf("Applied anti-bot measures: UA rotation=%v, header randomization=%v, cookie handling=%v",
+			// options.AntiBotConfig.EnableUserAgentRotation,
+			// options.AntiBotConfig.EnableHeaderRandomization,
+			// options.AntiBotConfig.EnableCookieHandling)
 		}
 	} else {
 		// Add basic extensions if anti-bot is not configured
@@ -125,6 +130,19 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 		metrics.Initialize(options.EnableFullContent)
 	}
 
+	// Calculate optimal bloom filter size based on expected visits
+	// Use a larger size for more accuracy, smaller size for less memory usage
+	expectedURLs := 10000 // Default minimum size to avoid too many false positives
+	if options.MaxVisits != nil && *options.MaxVisits > 0 {
+		expectedURLs = *options.MaxVisits * 10 // Estimate 10x the max visits as potential URLs
+	}
+
+	// Create bloom filter with 1% false positive rate
+	bloomSize := dedup.CalculateOptimalSize(expectedURLs, 0.01)
+	hashFuncs := dedup.CalculateOptimalHashFunctions(bloomSize, expectedURLs)
+
+	// Debug: log.Printf("Initialized URL filter with size %d and %d hash functions", bloomSize, hashFuncs)
+
 	return &Crawler{
 		Collector: collector,
 		Options:   options,
@@ -132,6 +150,7 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 		cancel:    cancel,
 		isRunning: false,
 		storage:   storage,
+		urlFilter: dedup.NewBloomFilter(bloomSize, hashFuncs),
 	}
 }
 
@@ -165,12 +184,11 @@ func (c *Crawler) Start() {
 				return
 			default:
 				visitCount++
-				if c.Options.MaxVisits > 0 && visitCount > c.Options.MaxVisits {
+				if c.Options.MaxVisits != nil && visitCount > *c.Options.MaxVisits {
 					r.Abort()
 					c.Stop()
 					return
 				}
-				log.Println("Visiting", r.URL.String())
 			}
 		})
 
@@ -286,11 +304,21 @@ func (c *Crawler) handleLink(e *colly.HTMLElement) {
 	link := e.Attr("href")
 	absURL := e.Request.AbsoluteURL(link)
 
+	// Skip if URL doesn't match allowed patterns
 	if !c.isAllowedURL(absURL) {
 		return
 	}
 
-	log.Printf("Link found: %v -> %v", e.Text, absURL)
+	// Skip URLs we've already seen (deduplication using bloom filter)
+	if c.urlFilter.Contains(absURL) {
+		// Debug: log.Printf("Skipping already visited URL: %s", absURL)
+		return
+	}
+
+	// Mark URL as seen before visiting
+	c.urlFilter.Add(absURL)
+
+	// Debug: log.Printf("Link found: %v -> %v", e.Text, absURL)
 	c.Collector.Visit(absURL)
 }
 

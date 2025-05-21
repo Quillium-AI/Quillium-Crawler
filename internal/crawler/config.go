@@ -17,9 +17,22 @@ func LoadConfigFromEnv() (*CrawlerConfig, error) {
 	}
 
 	// Optional values with defaults
-	maxDepth, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_MAX_DEPTH", "3"))
+	var maxDepth *int
+	if envMaxDepth := os.Getenv("CRAWLER_MAX_DEPTH"); envMaxDepth != "" {
+		if d, err := strconv.Atoi(envMaxDepth); err == nil && d >= 0 {
+			maxDepth = &d
+		}
+	}
+
 	parallelRequests, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_PARALLEL_REQUESTS", "10"))
-	maxVisits, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_MAX_VISITS", "1000"))
+
+	var maxVisits *int
+	if envMaxVisits := os.Getenv("CRAWLER_MAX_VISITS"); envMaxVisits != "" {
+		if v, err := strconv.Atoi(envMaxVisits); err == nil && v > 0 {
+			maxVisits = &v
+		}
+	}
+
 	respectRobotsTxt, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_RESPECT_ROBOTS_TXT", "true"))
 	delayMs, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_DELAY_MS", "50"))
 	randomDelayMs, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_RANDOM_DELAY_MS", "50"))
