@@ -19,6 +19,7 @@ Thank you to all the people who have contributed to Quillium!
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/HadiCherkaoui"><img src="https://avatars.githubusercontent.com/u/134227113?v=4" width="100px;" alt="Hadi Cherkaoui"/><br /><sub><b>Hadi Cherkaoui</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Hadi-Cher"><img src="https://avatars.githubusercontent.com/u/178153633?v=4" width="100px;" alt="Hadi Cherkaoui"/><br /><sub><b>Hadi Cherkaoui</b></sub></a></td>
     </tr>
   </tbody>
 </table>
