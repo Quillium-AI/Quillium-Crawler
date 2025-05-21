@@ -3,7 +3,7 @@ updates:
 
   # Security updates for Go backend (does NOT update versions)
   - package-ecosystem: "gomod"
-    directory: "/src/backend"
+    directory: "/"
     schedule:
       interval: "daily"
     commit-message:
