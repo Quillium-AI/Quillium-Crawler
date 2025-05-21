@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func SetupRoutes(mux *http.ServeMux) {
@@ -11,6 +13,9 @@ func SetupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/livez", livezHandler)
 	mux.HandleFunc("/readyz", readyzHandler)
 	mux.HandleFunc("/version", versionHandler)
+
+	// Metrics endpoint
+	mux.Handle("/metrics", promhttp.Handler())
 }
 
 func livezHandler(w http.ResponseWriter, r *http.Request) {

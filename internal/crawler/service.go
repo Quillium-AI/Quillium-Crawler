@@ -3,63 +3,39 @@ package crawler
 import (
 	"context"
 	"log"
+	"net/http"
+	"strconv"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/Quillium-AI/Quillium-Crawler/internal/metrics"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )
 
-// DefaultCrawlerOptions returns a CrawlerOptions with sensible defaults
-func DefaultCrawlerOptions() *CrawlerOptions {
-	return &CrawlerOptions{
-		MaxDepth:           3,
-		UserAgent:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
-		ParallelRequests:   2,
-		MaxVisits:          1000,
-		RespectRobotsTxt:   true,
-		Delay:              200 * time.Millisecond,
-		RandomDelay:        100 * time.Millisecond,
-		Timeout:            10 * time.Second,
-		IgnoreQueryStrings: false,
-	}
-}
-
-// Crawler represents a web crawler instance
-type Crawler struct {
-	Collector *colly.Collector
-	Options   *CrawlerOptions
-	ctx       context.Context
-	cancel    context.CancelFunc
-	isRunning bool
-	mutex     sync.RWMutex
-	wg        sync.WaitGroup
-}
-
 // NewCrawler creates a new crawler with the given options
-func NewCrawler(options *CrawlerOptions) *Crawler {
-	if options == nil {
-		options = DefaultCrawlerOptions()
-	}
+func NewCrawler(options *CrawlerConfig) *Crawler {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Build all collector options in one place to avoid duplication
 	collectorOptions := []func(*colly.Collector){
 		colly.MaxDepth(options.MaxDepth),
 		colly.UserAgent(options.UserAgent),
-		colly.Async(true),
+		colly.Async(true), // Enable async for better performance
 	}
 
-	// Handle robots.txt if needed
-	if options.RespectRobotsTxt {
-		collector := colly.NewCollector()
-		collector.AllowURLRevisit = true
+	// By default Colly respects robots.txt unless IgnoreRobotsTxt is explicitly set
+	if !options.RespectRobotsTxt {
+		collectorOptions = append(collectorOptions, colly.IgnoreRobotsTxt())
+	} else {
+		// Allow URL revisit when respecting robots.txt
 		collectorOptions = append(collectorOptions, func(c *colly.Collector) {
 			c.AllowURLRevisit = true
 		})
 	}
 
+	// Add domain filters
 	if len(options.AllowedDomains) > 0 {
 		collectorOptions = append(collectorOptions, colly.AllowedDomains(options.AllowedDomains...))
 	}
@@ -75,23 +51,79 @@ func NewCrawler(options *CrawlerOptions) *Crawler {
 		})
 	}
 
-	collector := colly.NewCollector()
-	// Apply all collector options
-	for _, option := range collectorOptions {
-		option(collector)
-	}
+	// Create the collector with all options at once for better initialization
+	collector := colly.NewCollector(collectorOptions...)
 
-	// Set limits
-	collector.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Parallelism: options.ParallelRequests,
-		Delay:       options.Delay,
-		RandomDelay: options.RandomDelay,
+	// Enable DNS caching to reduce network latency
+	collector.WithTransport(&http.Transport{
+		DisableKeepAlives:   false, // Enable keep-alives for connection reuse
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
 	})
 
-	// Add extensions
-	extensions.RandomUserAgent(collector)
-	extensions.Referer(collector)
+	// Set optimized limits with per-domain parallelism for better performance
+	// This allows more concurrent requests while still respecting per-domain rate limits
+	if options.AntiBotConfig != nil && options.AntiBotConfig.EnableSophisticatedDelays {
+		// Global limit rule for all domains
+		collector.Limit(&colly.LimitRule{
+			DomainGlob:  "*",
+			Parallelism: options.ParallelRequests,
+			Delay:       options.Delay,
+			RandomDelay: GetRandomDelay(options.AntiBotConfig.BaseDelay, options.AntiBotConfig.RandomDelayFactor),
+		})
+
+		// Add specific rules for common domains to allow more parallel requests
+		// while still respecting the global delay settings
+		if len(options.AllowedDomains) > 0 {
+			for _, domain := range options.AllowedDomains {
+				collector.Limit(&colly.LimitRule{
+					DomainGlob:  domain,
+					Parallelism: options.ParallelRequests * 2, // Double parallelism for known domains
+					Delay:       options.Delay,
+					RandomDelay: GetRandomDelay(options.AntiBotConfig.BaseDelay, options.AntiBotConfig.RandomDelayFactor),
+				})
+			}
+		}
+	} else {
+		// Use standard delay settings with optimized parallelism
+		collector.Limit(&colly.LimitRule{
+			DomainGlob:  "*",
+			Parallelism: options.ParallelRequests,
+			Delay:       options.Delay,
+			RandomDelay: options.RandomDelay,
+		})
+	}
+
+	// Apply anti-bot measures if configured
+	if options.AntiBotConfig != nil {
+		if err := ApplyAntiBotMeasures(collector, options.AntiBotConfig); err != nil {
+			log.Printf("Warning: Failed to apply anti-bot measures: %v", err)
+		} else {
+			log.Printf("Applied anti-bot measures: UA rotation=%v, header randomization=%v, cookie handling=%v",
+				options.AntiBotConfig.EnableUserAgentRotation,
+				options.AntiBotConfig.EnableHeaderRandomization,
+				options.AntiBotConfig.EnableCookieHandling)
+		}
+	} else {
+		// Add basic extensions if anti-bot is not configured
+		extensions.RandomUserAgent(collector)
+		extensions.Referer(collector)
+
+		// Set Accept-Language header if configured
+		if options.AcceptLanguage != "" {
+			collector.OnRequest(func(r *colly.Request) {
+				r.Headers.Set("Accept-Language", options.AcceptLanguage)
+			})
+		}
+	}
+
+	// Initialize storage
+	storage := NewJSONStorage(options.OutputFile)
+	// Initialize metrics if enabled
+	if options.EnableMetrics {
+		metrics.Initialize(options.EnableFullContent)
+	}
 
 	return &Crawler{
 		Collector: collector,
@@ -99,6 +131,7 @@ func NewCrawler(options *CrawlerOptions) *Crawler {
 		ctx:       ctx,
 		cancel:    cancel,
 		isRunning: false,
+		storage:   storage,
 	}
 }
 
@@ -176,45 +209,114 @@ func (c *Crawler) IsRunning() bool {
 
 // setupCollector configures the collector with callbacks
 func (c *Crawler) setupCollector() {
-	c.Collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
-		absURL := e.Request.AbsoluteURL(link)
+	// Setup full content collection if enabled
+	if c.Options.EnableFullContent {
+		c.Collector.OnResponse(func(r *colly.Response) {
+			url := r.Request.URL.String()
+			// Use a mutex to prevent concurrent map access
 
-		// Check if URL is in allowed/disallowed lists
-		if len(c.Options.AllowedURLs) > 0 {
-			allowed := false
-			for _, pattern := range c.Options.AllowedURLs {
-				if strings.Contains(absURL, pattern) {
-					allowed = true
-					break
+			// Store the full content
+			if page, exists := c.storage.GetPage(url); exists {
+				page.FullContent = string(r.Body)
+				if err := c.storage.SavePage(page); err != nil {
+					log.Printf("Error saving full content for %s: %v", url, err)
+				}
+			} else {
+				// Create a new page entry with full content
+				page := &PageData{
+					URL:         url,
+					FullContent: string(r.Body),
+				}
+				if err := c.storage.SavePage(page); err != nil {
+					log.Printf("Error saving new page with full content for %s: %v", url, err)
 				}
 			}
-			if !allowed {
-				return
+
+			// Track content size for metrics
+			if c.Options.EnableMetrics {
+				metrics.ContentSize.Observe(float64(len(r.Body)))
 			}
-		}
+		})
+	}
 
-		for _, pattern := range c.Options.DisallowedURLs {
-			if strings.Contains(absURL, pattern) {
-				return
-			}
-		}
-
-		log.Printf("Link found: %v -> %v", e.Text, absURL)
-		c.Collector.Visit(absURL)
-	})
-
+	// Error handling with more context
 	c.Collector.OnError(func(r *colly.Response, err error) {
-		log.Printf("Error visiting %s: %v", r.Request.URL, err)
+		if r == nil {
+			log.Printf("Request failed: %v", err)
+			return
+		}
+
+		status := "unknown"
+		if r.StatusCode > 0 {
+			status = strconv.Itoa(r.StatusCode)
+		}
+
+		log.Printf("Request failed for %s (Status: %s): %v",
+			r.Request.URL, status, err)
+
+		// Increment error counter if metrics are enabled
+		if c.Options.EnableMetrics {
+			metrics.RequestErrors.Inc()
+		}
 	})
+
+	// Success callback for metrics
+	c.Collector.OnResponse(func(r *colly.Response) {
+		if c.Options.EnableMetrics {
+			metrics.RequestsTotal.Inc()
+			if r.StatusCode > 0 {
+				metrics.RequestsByStatus.WithLabelValues(strconv.Itoa(r.StatusCode)).Inc()
+			}
+		}
+	})
+
+	// Page crawled counter
+	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
+		if c.Options.EnableMetrics {
+			metrics.PagesCrawled.Inc()
+		}
+	})
+
+	c.Collector.OnHTML("a[href]", c.handleLink)
+	c.Collector.OnError(c.handleError)
 }
 
-// StartCrawler is a legacy function for backward compatibility
-func StartCrawler(collector *colly.Collector, startURL string) {
-	options := DefaultCrawlerOptions()
-	options.StartURL = startURL
+// handleLink processes discovered links and applies filtering before visiting
+func (c *Crawler) handleLink(e *colly.HTMLElement) {
+	link := e.Attr("href")
+	absURL := e.Request.AbsoluteURL(link)
 
-	crawler := NewCrawler(options)
-	crawler.Collector = collector // Use the provided collector
-	crawler.Start()
+	if !c.isAllowedURL(absURL) {
+		return
+	}
+
+	log.Printf("Link found: %v -> %v", e.Text, absURL)
+	c.Collector.Visit(absURL)
+}
+
+// isAllowedURL checks allowed/disallowed URL patterns
+func (c *Crawler) isAllowedURL(url string) bool {
+	if len(c.Options.AllowedURLs) > 0 {
+		allowed := false
+		for _, pattern := range c.Options.AllowedURLs {
+			if strings.Contains(url, pattern) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return false
+		}
+	}
+	for _, pattern := range c.Options.DisallowedURLs {
+		if strings.Contains(url, pattern) {
+			return false
+		}
+	}
+	return true
+}
+
+// handleError logs crawling errors
+func (c *Crawler) handleError(r *colly.Response, err error) {
+	log.Printf("Error visiting %s: %v", r.Request.URL, err)
 }
