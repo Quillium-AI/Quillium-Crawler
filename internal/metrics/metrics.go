@@ -15,6 +15,14 @@ var (
 		},
 	)
 
+	// Total active crawlers
+	ActiveCrawlers = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "crawler_active_crawlers",
+			Help: "Number of active crawlers",
+		},
+	)
+
 	// RequestsByStatus counts requests by status code
 	RequestsByStatus = promauto.NewCounterVec(
 		prometheus.CounterOpts{

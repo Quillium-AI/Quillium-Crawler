@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"sync"
+	"github.com/Quillium-AI/Quillium-Crawler/internal/metrics"
 )
 
 // NewCrawlerManager creates a new crawler manager
@@ -48,6 +49,7 @@ func (m *CrawlerManager) StartCrawler(id string) bool {
 	}
 
 	crawler.Start()
+	metrics.ActiveCrawlers.Inc()
 	return true
 }
 
@@ -62,6 +64,7 @@ func (m *CrawlerManager) StopCrawler(id string) bool {
 	}
 
 	crawler.Stop()
+	metrics.ActiveCrawlers.Dec()
 	return true
 }
 
