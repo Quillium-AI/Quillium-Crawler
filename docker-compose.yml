@@ -14,14 +14,8 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
     container_name: elasticsearch
-    environment:
-      - node.name=es01
-      - cluster.name=docker-cluster
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-      - ELASTIC_PASSWORD=changeme
-      - xpack.security.enabled=true
+    env_file:
+      - .env
     ulimits:
       memlock:
         soft: -1

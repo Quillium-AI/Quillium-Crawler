@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Quillium-AI/Quillium-Crawler/internal/dedup"
+	"github.com/Quillium-AI/Quillium-Crawler/internal/elasticsearch"
 	"github.com/Quillium-AI/Quillium-Crawler/internal/metrics"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
@@ -104,11 +105,6 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 	if options.AntiBotConfig != nil {
 		if err := ApplyAntiBotMeasures(collector, options.AntiBotConfig); err != nil {
 			log.Printf("Warning: Failed to apply anti-bot measures: %v", err)
-		} else {
-			// Debug: log.Printf("Applied anti-bot measures: UA rotation=%v, header randomization=%v, cookie handling=%v",
-			// options.AntiBotConfig.EnableUserAgentRotation,
-			// options.AntiBotConfig.EnableHeaderRandomization,
-			// options.AntiBotConfig.EnableCookieHandling)
 		}
 	} else {
 		// Add basic extensions if anti-bot is not configured
@@ -123,8 +119,6 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 		}
 	}
 
-	// Initialize storage
-	storage := NewJSONStorage(options.OutputFile)
 	// Initialize metrics if enabled
 	if options.EnableMetrics {
 		metrics.Initialize(options.EnableFullContent)
@@ -149,7 +143,7 @@ func NewCrawler(options *CrawlerConfig) *Crawler {
 		ctx:       ctx,
 		cancel:    cancel,
 		isRunning: false,
-		storage:   storage,
+		Storage:   options.Storage,
 		urlFilter: dedup.NewBloomFilter(bloomSize, hashFuncs),
 	}
 }
@@ -227,35 +221,53 @@ func (c *Crawler) IsRunning() bool {
 
 // setupCollector configures the collector with callbacks
 func (c *Crawler) setupCollector() {
-	// Setup full content collection if enabled
-	if c.Options.EnableFullContent {
-		c.Collector.OnResponse(func(r *colly.Response) {
-			url := r.Request.URL.String()
-			// Use a mutex to prevent concurrent map access
+	// Extract and store page data for all pages
+	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
+		url := e.Request.URL.String()
 
-			// Store the full content
-			if page, exists := c.storage.GetPage(url); exists {
-				page.FullContent = string(r.Body)
-				if err := c.storage.SavePage(page); err != nil {
-					log.Printf("Error saving full content for %s: %v", url, err)
-				}
-			} else {
-				// Create a new page entry with full content
-				page := &PageData{
-					URL:         url,
-					FullContent: string(r.Body),
-				}
-				if err := c.storage.SavePage(page); err != nil {
-					log.Printf("Error saving new page with full content for %s: %v", url, err)
-				}
-			}
+		// Extract page title
+		title := e.ChildText("title")
+		if title == "" {
+			title = e.ChildText("h1")
+		}
+
+		// Create a snippet from meta description or first paragraph
+		snippet := e.ChildAttr("meta[name=description]", "content")
+		if snippet == "" {
+			snippet = e.ChildText("p")
+		}
+		// Trim snippet if it's too long
+		if len(snippet) > 500 {
+			snippet = snippet[:500] + "..."
+		}
+
+		// Prepare page data
+		pageData := &elasticsearch.PageData{
+			URL:     url,
+			Title:   title,
+			Snippet: snippet,
+		}
+
+		// Add full content if enabled
+		if c.Options.EnableFullContent {
+			pageData.FullContent = string(e.Response.Body)
 
 			// Track content size for metrics
 			if c.Options.EnableMetrics {
-				metrics.ContentSize.Observe(float64(len(r.Body)))
+				metrics.ContentSize.Observe(float64(len(e.Response.Body)))
 			}
-		})
-	}
+		}
+
+		// Save to storage
+		if err := c.Storage.SavePage(pageData); err != nil {
+			log.Printf("Error saving page data for %s: %v", url, err)
+		}
+
+		// Increment metrics counter
+		if c.Options.EnableMetrics {
+			metrics.PagesCrawled.Inc()
+		}
+	})
 
 	// Error handling with more context
 	c.Collector.OnError(func(r *colly.Response, err error) {
@@ -285,13 +297,6 @@ func (c *Crawler) setupCollector() {
 			if r.StatusCode > 0 {
 				metrics.RequestsByStatus.WithLabelValues(strconv.Itoa(r.StatusCode)).Inc()
 			}
-		}
-	})
-
-	// Page crawled counter
-	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
-		if c.Options.EnableMetrics {
-			metrics.PagesCrawled.Inc()
 		}
 	})
 

@@ -4,9 +4,11 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/Quillium-AI/Quillium-Crawler/internal/api"
 	"github.com/Quillium-AI/Quillium-Crawler/internal/crawler"
+	"github.com/Quillium-AI/Quillium-Crawler/internal/elasticsearch"
 )
 
 // Global configuration
@@ -23,14 +25,40 @@ func init() {
 	log.Printf("Configuration loaded. Starting URL: %s, Max Depth: %d",
 		config.StartURL, config.MaxDepth)
 
-	// Initialize the storage file
-	storage := crawler.NewJSONStorage(config.OutputFile)
-	if err := storage.Initialize(); err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
-	}
+	// Initialize ElasticSearch configuration
+	elasticAddresses, _, _ := crawler.LoadESConfigFromEnv()
+	log.Printf("ElasticSearch configuration loaded. Addresses: %v", elasticAddresses)
 }
 
 func main() {
+	// Initialize ElasticSearch client
+	elasticAddresses, elasticUsername, elasticPassword := crawler.LoadESConfigFromEnv()
+	elasticClient, err := elasticsearch.Initialize(elasticAddresses, elasticUsername, elasticPassword)
+	if err != nil {
+		log.Fatalf("Failed to initialize ElasticSearch client: %v", err)
+	}
+
+	// Get index name from config
+	indexName := crawler.GetEnvWithDefault("CRAWLER_INDEX_NAME", "crawled_data")
+	log.Printf("Using ElasticSearch index: %s", indexName)
+
+	// Wait for Elasticsearch to be ready with retry mechanism
+	log.Println("Waiting for Elasticsearch to be ready...")
+	maxRetries := 10
+	initialBackoff := 2 * time.Second
+	if err := elasticsearch.WaitForElasticsearch(elasticClient, maxRetries, initialBackoff); err != nil {
+		log.Fatalf("Failed to connect to Elasticsearch: %v", err)
+	}
+
+	// Create ElasticSearch storage
+	esStorage := elasticsearch.NewESStorage(elasticClient, indexName)
+
+	// Initialize the index if it doesn't exist
+	log.Println("Initializing Elasticsearch index...")
+	if err := esStorage.InitializeIndex(); err != nil {
+		log.Printf("Warning: Failed to initialize Elasticsearch index: %v", err)
+	}
+
 	// Create crawler manager
 	manager := crawler.NewCrawlerManager()
 
@@ -43,12 +71,13 @@ func main() {
 	for i, url := range startURLs {
 		cfgCopy := *config
 		cfgCopy.StartURL = url
+		cfgCopy.IndexName = indexName
 		crawlerID := "crawler_" + strconv.Itoa(i+1)
 
-		crawlerInstance := crawler.NewCrawler(&cfgCopy)
+		// Set the ElasticSearch storage in the crawler config
+		cfgCopy.Storage = esStorage
 
-		storage := crawler.NewJSONStorage(cfgCopy.OutputFile)
-		storage.RegisterStorageCallbacks(crawlerInstance.Collector)
+		crawlerInstance := crawler.NewCrawler(&cfgCopy)
 
 		if len(cfgCopy.Proxies) > 0 {
 			proxyManager := crawler.NewProxyManager(cfgCopy.Proxies)

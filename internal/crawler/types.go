@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Quillium-AI/Quillium-Crawler/internal/dedup"
+	"github.com/Quillium-AI/Quillium-Crawler/internal/elasticsearch"
 	"github.com/gocolly/colly"
 )
 
@@ -18,24 +19,24 @@ type Crawler struct {
 	isRunning bool
 	mutex     sync.RWMutex
 	wg        sync.WaitGroup
-	storage   Storage            // Interface for storage operations
+	Storage   Storage         // Interface for storage operations
 	urlFilter *dedup.BloomFilter // Bloom filter for URL deduplication
 }
 
 // Storage defines the interface for storage operations
 type Storage interface {
-	GetPage(url string) (*PageData, bool)
-	SavePage(page *PageData) error
+	GetPage(url string) (*elasticsearch.PageData, bool)
+	SavePage(page *elasticsearch.PageData) error
 }
 
 // CrawlerConfig contains all configuration options loaded from environment variables
 type CrawlerConfig struct {
 	AcceptLanguage     string
 	StartURL           string
-	MaxDepth           *int          // Optional: if nil, no depth limit
+	MaxDepth           *int // Optional: if nil, no depth limit
 	UserAgent          string
 	ParallelRequests   int
-	MaxVisits          *int          // Optional: if nil, no visit limit
+	MaxVisits          *int // Optional: if nil, no visit limit
 	RespectRobotsTxt   bool
 	Delay              time.Duration
 	RandomDelay        time.Duration
@@ -45,7 +46,8 @@ type CrawlerConfig struct {
 	DisallowedDomains  []string
 	AllowedURLs        []string
 	DisallowedURLs     []string
-	OutputFile         string
+	IndexName          string
+	Storage            Storage
 	Proxies            []string
 	AntiBotConfig      *AntiBotConfig
 	EnableFullContent  bool
@@ -55,14 +57,6 @@ type CrawlerConfig struct {
 type CrawlerManager struct {
 	crawlers map[string]*Crawler
 	mutex    sync.RWMutex
-}
-
-// PageData represents the data extracted from a crawled page
-type PageData struct {
-	URL         string `json:"url"`
-	Title       string `json:"title"`
-	Snippet     string `json:"snippet"`
-	FullContent string `json:"full_content,omitempty"` // Full HTML content when enabled
 }
 
 // JSONStorage handles storing crawled data to a JSON file

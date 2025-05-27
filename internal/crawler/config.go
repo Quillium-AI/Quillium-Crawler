@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+// LoadESConfigFromEnv loads Elasticsearch configuration from environment variables
+func LoadESConfigFromEnv() ([]string, string, string) {
+	elasticsearchAddresses := SplitEnvVar("CRAWLER_ELASTICSEARCH_ADDRESSES", ",")
+	elasticsearchUsername := os.Getenv("CRAWLER_ELASTICSEARCH_USERNAME")
+	elasticsearchPassword := os.Getenv("CRAWLER_ELASTICSEARCH_PASSWORD")
+	return elasticsearchAddresses, elasticsearchUsername, elasticsearchPassword
+}
+
 // LoadConfigFromEnv loads crawler configuration from environment variables
 func LoadConfigFromEnv() (*CrawlerConfig, error) {
 	// Required values
@@ -24,7 +32,7 @@ func LoadConfigFromEnv() (*CrawlerConfig, error) {
 		}
 	}
 
-	parallelRequests, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_PARALLEL_REQUESTS", "10"))
+	parallelRequests, _ := strconv.Atoi(GetEnvWithDefault("CRAWLER_PARALLEL_REQUESTS", "10"))
 
 	var maxVisits *int
 	if envMaxVisits := os.Getenv("CRAWLER_MAX_VISITS"); envMaxVisits != "" {
@@ -33,11 +41,11 @@ func LoadConfigFromEnv() (*CrawlerConfig, error) {
 		}
 	}
 
-	respectRobotsTxt, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_RESPECT_ROBOTS_TXT", "true"))
-	delayMs, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_DELAY_MS", "50"))
-	randomDelayMs, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_RANDOM_DELAY_MS", "50"))
-	timeoutSec, _ := strconv.Atoi(getEnvWithDefault("CRAWLER_TIMEOUT_SEC", "10"))
-	ignoreQueryStrings, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_IGNORE_QUERY_STRINGS", "false"))
+	respectRobotsTxt, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_RESPECT_ROBOTS_TXT", "true"))
+	delayMs, _ := strconv.Atoi(GetEnvWithDefault("CRAWLER_DELAY_MS", "50"))
+	randomDelayMs, _ := strconv.Atoi(GetEnvWithDefault("CRAWLER_RANDOM_DELAY_MS", "50"))
+	timeoutSec, _ := strconv.Atoi(GetEnvWithDefault("CRAWLER_TIMEOUT_SEC", "10"))
+	ignoreQueryStrings, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_IGNORE_QUERY_STRINGS", "false"))
 
 	// Lists
 	allowedDomains := SplitEnvVar("CRAWLER_ALLOWED_DOMAINS", ",")
@@ -48,26 +56,23 @@ func LoadConfigFromEnv() (*CrawlerConfig, error) {
 	// Proxies
 	proxies := SplitEnvVar("CRAWLER_PROXIES", ",")
 
-	// Output file
-	outputFile := getEnvWithDefault("CRAWLER_OUTPUT_FILE", "crawled_data.json")
-
 	// User agent
-	userAgent := getEnvWithDefault("CRAWLER_USER_AGENT",
+	userAgent := GetEnvWithDefault("CRAWLER_USER_AGENT",
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
 
 	// Accept-Language header
-	acceptLanguage := getEnvWithDefault("CRAWLER_ACCEPT_LANGUAGE", "")
+	acceptLanguage := GetEnvWithDefault("CRAWLER_ACCEPT_LANGUAGE", "")
 
 	// Content and metrics configuration
-	enableFullContent, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_ENABLE_FULL_CONTENT", "false"))
-	enableMetrics, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_ENABLE_METRICS", "false"))
+	enableFullContent, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_ENABLE_FULL_CONTENT", "false"))
+	enableMetrics, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_ENABLE_METRICS", "false"))
 
 	// Anti-bot configuration
-	enableUserAgentRotation, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_ENABLE_USER_AGENT_ROTATION", "true"))
-	enableHeaderRandomization, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_ENABLE_HEADER_RANDOMIZATION", "true"))
-	enableCookieHandling, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_ENABLE_COOKIE_HANDLING", "true"))
-	enableSophisticatedDelays, _ := strconv.ParseBool(getEnvWithDefault("CRAWLER_ENABLE_SOPHISTICATED_DELAYS", "true"))
-	randomDelayFactor, _ := strconv.ParseFloat(getEnvWithDefault("CRAWLER_RANDOM_DELAY_FACTOR", "1.5"), 64)
+	enableUserAgentRotation, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_ENABLE_USER_AGENT_ROTATION", "true"))
+	enableHeaderRandomization, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_ENABLE_HEADER_RANDOMIZATION", "true"))
+	enableCookieHandling, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_ENABLE_COOKIE_HANDLING", "true"))
+	enableSophisticatedDelays, _ := strconv.ParseBool(GetEnvWithDefault("CRAWLER_ENABLE_SOPHISTICATED_DELAYS", "true"))
+	randomDelayFactor, _ := strconv.ParseFloat(GetEnvWithDefault("CRAWLER_RANDOM_DELAY_FACTOR", "1.5"), 64)
 	customUserAgents := SplitEnvVar("CRAWLER_CUSTOM_USER_AGENTS", ",")
 	customAcceptLanguages := SplitEnvVar("CRAWLER_CUSTOM_ACCEPT_LANGUAGES", ",")
 
@@ -99,7 +104,6 @@ func LoadConfigFromEnv() (*CrawlerConfig, error) {
 		DisallowedDomains:  disallowedDomains,
 		AllowedURLs:        allowedURLs,
 		DisallowedURLs:     disallowedURLs,
-		OutputFile:         outputFile,
 		Proxies:            proxies,
 		EnableFullContent:  enableFullContent,
 		EnableMetrics:      enableMetrics,
@@ -108,7 +112,7 @@ func LoadConfigFromEnv() (*CrawlerConfig, error) {
 }
 
 // Helper function to get env var with default value
-func getEnvWithDefault(key, defaultValue string) string {
+func GetEnvWithDefault(key, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		return defaultValue
