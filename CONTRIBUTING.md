@@ -1,6 +1,6 @@
 # Contributing to Quillium
 
-Thank you for your interest in contributing to Quillium! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Quillium! This document provides guidelines and instructions for contributing to Quillium-Crawler.
 
 ## Code of Conduct
 
@@ -48,104 +48,72 @@ Enhancement suggestions are also tracked as GitHub issues. Please provide clear 
 
 ### Development Workflow
 
-1. Set up your development environment
+To contribute to Quillium-Crawler, you'll need to set up your local backend environment. Please follow these steps:
+
+1. Clone the repository
    ```bash
-   # Clone the repository
-   git clone https://github.com/Quillium-AI/Quillium.git
-   cd Quillium
-   
-   # Install backend dependencies
-   cd src/backend
-   go mod download
-   
-   # Install frontend dependencies
-   cd ../frontend
-   pnpm install
+   git clone https://github.com/Quillium-AI/Quillium-Crawler.git
+   cd Quillium-Crawler
    ```
 
-2. Run the application in development mode
+2. Install dependencies
    ```bash
-   # Using the Makefile (recommended)
-   make dev
-   
-   # Or manually
-   # Terminal 1 - Run the backend
-   cd src/backend
+   go mod download
+   ```
+
+3. Configure your environment
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   # Edit the .env file to configure your crawler
+   ```
+
+4. Run the crawler
+   ```bash
    go run main.go
-   
-   # Terminal 2 - Run the frontend
-   cd src/frontend
-   pnpm dev
    ```
 
 3. Make your changes and ensure they pass all tests
    ```bash
-   # Run backend tests
-   cd src/backend
+   # Run tests
    go test ./...
-   
-   # Run frontend tests
-   cd src/frontend
-   pnpm test
    ```
 
 ### Docker Development
 
-**Important:** When building the Docker image, you must pre-build the frontend locally first:
+To run the crawler using Docker:
 
 ```bash
-# Navigate to the frontend directory
-cd src/frontend
-
-# Install dependencies if not already installed
-pnpm install
-
-# Build the frontend
-pnpm build
-
-# Then you can build the Docker image from the project root
-cd ../../
+# Build and run with Docker Compose
 docker compose up -d --build
+
+# Or build and run manually
+docker build -t quillium-crawler .
+docker run --env-file .env quillium-crawler
 ```
 
-The Dockerfile is configured to use the pre-built frontend files rather than building them inside the container. This approach resolves dependency issues and significantly improves build times.
+The Docker setup uses the environment variables from your `.env` file, so make sure it's properly configured before building.
 
 ## Project Structure
 
-The Quillium project is organized into several key components:
+The Quillium-Crawler project is organized as follows:
 
-### Backend (Go)
 ```
-src/backend/
-├── cmd/                  # Application entry points
-│   └── server/           # Main server application
-├── internal/             # Internal packages
-│   ├── api/              # API handlers and routes
-│   │   ├── restapi/      # REST API implementation
-│   │   └── wsapi/        # WebSocket API implementation
-│   ├── auth/             # Authentication logic
-│   ├── chat/             # Chat functionality
-│   ├── db/               # Database access and models
-│   ├── security/         # Security utilities
-│   ├── settings/         # Settings management
-│   └── user/             # User management
-├── migrations/           # Database migrations
-└── tests/                # Integration tests
-```
-
-### Frontend (React)
-```
-src/frontend/
-├── public/               # Static assets
-├── src/
-│   ├── components/       # Reusable UI components
-│   ├── contexts/         # React contexts
-│   ├── hooks/            # Custom React hooks
-│   ├── pages/            # Page components
-│   ├── services/         # API service clients
-│   ├── styles/           # Global styles
-│   └── utils/            # Utility functions
-└── tests/                # Frontend tests
+Quillium-Crawler/
+├── internal/
+│   ├── api/              # API server and routes
+│   ├── crawler/          # Crawling logic, config, anti-bot, proxies
+│   ├── dedup/            # Deduplication (bloom filter)
+│   ├── elasticsearch/    # Elasticsearch integration
+│   └── metrics/          # Metrics and monitoring
+├── main.go               # Application entry point
+├── Dockerfile            # Docker build file
+├── .env.example          # Example environment variables
+├── README.md             # Project overview
+├── CONTRIBUTING.md       # Contribution guidelines
+├── go.mod                # Go module definition
+├── go.sum                # Go dependency checksums
+├── docker-compose.yml    # Docker Compose configuration
 ```
 
 For more detailed information about the project structure and architecture, please refer to the [documentation](https://docs.quillium.dev).
@@ -155,13 +123,11 @@ For more detailed information about the project structure and architecture, plea
 ### Code Style
 
 - **Go**: Follow the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments) and use `gofmt` to format your code.
-- **JavaScript/React**: Follow the ESLint configuration in the project. We use a combination of React best practices and Airbnb style guide.
-- **CSS**: Use CSS modules for component styling to avoid global style conflicts.
+- **Go**: Follow the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments) and use `gofmt` to format your code.
 
 ### Testing Requirements
 
-- **Backend**: All new features should include appropriate unit tests and integration tests. See the [Testing Documentation](https://docs.quillium.dev/backend/testing/) for details.
-- **Frontend**: Components should have unit tests using React Testing Library.
+- All new features should include appropriate unit tests and integration tests using Go's testing package.
 
 ### Commit Messages
 
