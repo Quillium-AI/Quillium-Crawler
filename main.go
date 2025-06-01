@@ -94,7 +94,7 @@ func main() {
 	}
 
 	// Start API server
-	if err := api.StartServer(":8080"); err != nil {
+	if err := api.StartServer(":8090"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
