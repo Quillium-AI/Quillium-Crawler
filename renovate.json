@@ -1,0 +1,61 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "platform": "gitlab",
+  "schedule": [
+    "before 3am on the first day of the month"
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch",
+      "matchPackageNames": [
+        "*"
+      ]
+    },
+    {
+      "matchFileNames": [
+        "internal/**"
+      ],
+      "matchDepTypes": [
+        "require"
+      ],
+      "groupName": "internal dependencies",
+      "labels": [
+        "go",
+        "dependencies"
+      ],
+      "matchPackageNames": [
+        "*"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "groupName": "Go",
+      "labels": [
+        "go"
+      ]
+    }
+  ],
+  "enabledManagers": [
+    "gomod"
+  ],
+  "gomod": {
+    "managerFilePatterns": [
+      "/go.mod/"
+    ]
+  }
+}
