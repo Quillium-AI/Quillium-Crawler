@@ -2,6 +2,9 @@
 
 Quillium-Crawler is a high-performance, extensible web crawler written in Go. It supports advanced anti-bot evasion, flexible domain/URL filtering, metrics, and Elasticsearch integration. For full documentation, see [docs.quillium.dev](https://docs.quillium.dev).
 
+# Table of Contents
+
+[[_TOC_]]
 
 ## Quick Start
 
