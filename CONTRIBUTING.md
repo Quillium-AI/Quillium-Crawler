@@ -1,6 +1,16 @@
 # Contributing to Quillium
 
-Thank you for your interest in contributing to Quillium! This document provides guidelines and instructions for contributing to Quillium-Crawler.
+## IMPORTANT: GitLab is our primary repository
+
+**PLEASE NOTE:** This GitHub repository is a mirror. All contributions should be made through our GitLab repository:
+- Repository URL: https://gitlab.cherkaoui.ch/quillium-ai/quillium-crawler
+- Issue Board: https://gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/-/issues
+
+**Any pull requests or issues opened on GitHub will be ignored and closed after a warning.**
+
+Please fork and create merge requests on GitLab instead.
+
+Thank you for your interest in contributing to Quillium! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
