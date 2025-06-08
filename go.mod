@@ -3,6 +3,7 @@ module github.com/Quillium-AI/Quillium-Crawler
 go 1.24.0
 
 require (
+	github.com/elastic/go-elasticsearch/v8 v8.18.0
 	github.com/gocolly/colly v1.2.0
 	github.com/google/uuid v1.6.0
 )
@@ -17,9 +18,10 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	go.opentelemetry.io/otel v1.28.0 // indirect
-	go.opentelemetry.io/otel/metric v1.28.0 // indirect
-	go.opentelemetry.io/otel/trace v1.28.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/otel v1.35.0 // indirect
+	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 )
 
@@ -30,7 +32,7 @@ require (
 	github.com/antchfx/xmlquery v1.4.4 // indirect
 	github.com/antchfx/xpath v1.3.3 // indirect
 	github.com/elastic/go-elasticsearch v0.0.0
-	github.com/elastic/go-elasticsearch/v8 v8.18.0
+	github.com/elastic/go-elasticsearch/v9 v9.0.0
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -38,7 +40,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/net v0.40.0
 	golang.org/x/text v0.25.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
