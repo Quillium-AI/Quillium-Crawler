@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Quillium-AI/Quillium-Crawler/internal/api"
-	"github.com/Quillium-AI/Quillium-Crawler/internal/crawler"
-	"github.com/Quillium-AI/Quillium-Crawler/internal/elasticsearch"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/api"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/crawler"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/elasticsearch"
 )
 
 // Global configuration

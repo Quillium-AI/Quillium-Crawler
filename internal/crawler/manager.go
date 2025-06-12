@@ -2,7 +2,7 @@ package crawler
 
 import (
 	"sync"
-	"github.com/Quillium-AI/Quillium-Crawler/internal/metrics"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/metrics"
 )
 
 // NewCrawlerManager creates a new crawler manager

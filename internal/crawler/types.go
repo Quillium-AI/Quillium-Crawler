@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Quillium-AI/Quillium-Crawler/internal/dedup"
-	"github.com/Quillium-AI/Quillium-Crawler/internal/elasticsearch"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/dedup"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/elasticsearch"
 	"github.com/gocolly/colly"
 )
 

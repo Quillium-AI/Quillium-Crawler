@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Quillium-AI/Quillium-Crawler/internal/dedup"
-	"github.com/Quillium-AI/Quillium-Crawler/internal/elasticsearch"
-	"github.com/Quillium-AI/Quillium-Crawler/internal/metrics"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/dedup"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/elasticsearch"
+	"gitlab.cherkaoui.ch/quillium-ai/quillium-crawler/internal/metrics"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )

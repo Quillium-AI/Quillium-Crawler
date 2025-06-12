@@ -1,4 +1,4 @@
-module github.com/Quillium-AI/Quillium-Crawler
+module gitlab.cherkaoui.ch/quillium-ai/quillium-crawler
 
 go 1.24.0
 
