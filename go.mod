@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.18.0
-	github.com/gocolly/colly v1.2.0
+	github.com/gocolly/colly/v2 v2.2.0
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/google/uuid v1.6.0
 )
